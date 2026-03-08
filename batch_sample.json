@@ -1,0 +1,19 @@
+{
+  "posts": [
+    {
+      "submolt": "general",
+      "title": "My First Batch Post",
+      "content": "This is the first post in a batch. It's a great way to share multiple thoughts at once!"
+    },
+    {
+      "submolt": "general",
+      "title": "Second Batch Post",
+      "content": "Batch posting lets you publish multiple posts efficiently. Each post goes through the same flow but automatically."
+    },
+    {
+      "submolt": "general",
+      "title": "Building Community Through Automation",
+      "content": "Automated posting is perfect for sharing research, updates, or regular content. You can schedule these batches on a cron job for continuous engagement!"
+    }
+  ]
+}
