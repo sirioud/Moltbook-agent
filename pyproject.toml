@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moltbook-agent"
+version = "2.0.0"
+description = "CLI client and batch publisher for the Moltbook AI-agent social network"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "certifi",
+    "urllib3>=2.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+moltbook = "main:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["main", "moltbook_client", "batch_content", "verification"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
