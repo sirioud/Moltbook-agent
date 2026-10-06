@@ -225,22 +225,43 @@ def _parse_run(run: list[str]) -> Optional[float]:
     return total + current if found else None
 
 
+def _split_merged_number(token: str) -> list[str]:
+    """Split a token that may be two merged number words (``twentythree``).
+
+    Returns a list of vocabulary tokens if a valid split is found, else
+    ``[token]``. Only splits into two parts to avoid ambiguous multi-way
+    decompositions.
+    """
+    if token in _VOCAB or token.isdigit():
+        return [token]
+    for i in range(3, len(token) - 2):
+        left, right = token[:i], token[i:]
+        if left in _NUMBER_WORDS and right in _NUMBER_WORDS:
+            return [left, right]
+    return [token]
+
+
 def _extract_numbers(tokens: list[str]) -> list[tuple[float, int, int]]:
     """Return ``(value, start_index, end_index)`` for each number phrase."""
+    # First, expand any merged number words (e.g. "twentythree" -> "twenty", "three")
+    expanded: list[str] = []
+    for token in tokens:
+        expanded.extend(_split_merged_number(token))
+
     phrases: list[tuple[float, int, int]] = []
     i = 0
-    n = len(tokens)
+    n = len(expanded)
     while i < n:
-        token = tokens[i]
+        token = expanded[i]
         if token in _NUMBER_WORDS or token.isdigit():
             j = i
             run: list[str] = []
             while j < n and (
-                tokens[j] in _NUMBER_WORDS
-                or tokens[j].isdigit()
-                or tokens[j] in ("and", "of")
+                expanded[j] in _NUMBER_WORDS
+                or expanded[j].isdigit()
+                or expanded[j] in ("and", "of")
             ):
-                run.append(tokens[j])
+                run.append(expanded[j])
                 j += 1
             while run and run[-1] in ("and", "of"):
                 run.pop()
@@ -253,9 +274,15 @@ def _extract_numbers(tokens: list[str]) -> list[tuple[float, int, int]]:
     return phrases
 
 
-def _detect_op(tokens: list[str]) -> Optional[str]:
-    """Return the arithmetic operator for the first operation word seen."""
+def _detect_op(tokens: list[str], allowed: Optional[frozenset[str]] = None) -> Optional[str]:
+    """Return the arithmetic operator for the first operation word seen.
+
+    If ``allowed`` is given, only consider words in that set (e.g. only
+    multiplication/division words when scanning after the second number).
+    """
     for token in tokens:
+        if allowed is not None and token not in allowed:
+            continue
         if token in _DIV:
             return "/"
         if token in _MUL:
@@ -275,9 +302,31 @@ def solve_challenge(challenge_text: str) -> Optional[float]:
     failures get an account suspended.
     """
     tokens = [_snap(token) for token in _clean(challenge_text)]
-    numbers = _extract_numbers(tokens)
+    # Expand merged number words (e.g. "twentythree" -> "twenty", "three")
+    expanded: list[str] = []
+    for token in tokens:
+        expanded.extend(_split_merged_number(token))
+    numbers = _extract_numbers(expanded)
     if not numbers:
         return None
+
+    # Merge adjacent numbers like "twenty three" that got split by noise
+    # (e.g. "tW/eN tY tHrEe" -> "twenty", "ty", "three" -> 20, 3 -> 23)
+    merged: list[tuple[float, int, int]] = []
+    i = 0
+    while i < len(numbers):
+        if (
+            i + 1 < len(numbers)
+            and numbers[i][0] % 10 == 0
+            and 0 < numbers[i + 1][0] < 10
+            and numbers[i + 1][1] - numbers[i][2] <= 2  # small gap (noise tokens)
+        ):
+            merged.append((numbers[i][0] + numbers[i + 1][0], numbers[i][1], numbers[i + 1][2]))
+            i += 2
+        else:
+            merged.append(numbers[i])
+            i += 1
+    numbers = merged
 
     if len(numbers) >= 2:
         first, second = numbers[0], numbers[1]
@@ -285,8 +334,15 @@ def solve_challenge(challenge_text: str) -> Optional[float]:
         # Prefer the words between the two numbers; that is where the operation
         # lives. Fall back to everything up to the last number so the trailing
         # question ("what is the new speed?") cannot contribute a stray verb.
-        between = tokens[first[2]:second[1]]
-        op = _detect_op(between) or _detect_op(tokens[:numbers[-1][2]])
+        between = expanded[first[2]:second[1]]
+        after_second = expanded[second[2]:]
+        # Check between numbers first, then after second number for mul/div
+        # only (to avoid "total" in trailing questions being picked up as addition)
+        op = (
+            _detect_op(between)
+            or _detect_op(after_second, _MUL | _DIV)
+            or _detect_op(expanded[:numbers[-1][2]])
+        )
         if op == "+":
             return a + b
         if op == "-":
@@ -298,17 +354,17 @@ def solve_challenge(challenge_text: str) -> Optional[float]:
         # No explicit operation word. "N ... each" is the one idiomatic
         # multiplication phrasing worth recognising ("six crabs each"); anything
         # else stays unsolved rather than guessing.
-        if "each" in tokens[second[2]:]:
+        if "each" in expanded[second[2]:]:
             return a * b
         return None
 
     # One number: handle the doubling / halving idioms.
     value = numbers[0][0]
-    if any(token in ("half", "halved", "halves") for token in tokens):
+    if any(token in ("half", "halved", "halves") for token in expanded):
         return value / 2
-    if any(token in ("double", "doubled", "doubles", "twice") for token in tokens):
+    if any(token in ("double", "doubled", "doubles", "twice") for token in expanded):
         return value * 2
-    if any(token in ("triple", "tripled", "triples") for token in tokens):
+    if any(token in ("triple", "tripled", "triples") for token in expanded):
         return value * 3
     return None
 
