@@ -6,8 +6,7 @@ Allows scheduling and publishing multiple posts efficiently.
 import json
 import time
 from pathlib import Path
-from typing import List, Dict, Optional
-from datetime import datetime
+from typing import List, Dict
 from moltbook_client import MoltbookClient, MoltbookError
 
 
@@ -41,14 +40,13 @@ class BatchContent:
         """Validate all posts have required fields"""
         errors = []
         for i, post in enumerate(posts):
-            if "title" not in post:
-                errors.append(f"Post {i}: missing 'title'")
-            if "content" not in post:
-                errors.append(f"Post {i}: missing 'content'")
-            if not isinstance(post.get("title"), str) or not post["title"].strip():
-                errors.append(f"Post {i}: title must be non-empty string")
-            if not isinstance(post.get("content"), str) or not post["content"].strip():
-                errors.append(f"Post {i}: content must be non-empty string")
+            if not isinstance(post, dict):
+                errors.append(f"Post {i}: must be an object")
+                continue
+            for key in ("title", "content"):
+                value = post.get(key)
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"Post {i}: '{key}' must be a non-empty string")
         
         return len(errors) == 0, errors
     
@@ -114,12 +112,15 @@ class BatchContent:
                     })
                     print(f"✗ Error: {e}")
             
-            # Delay between posts (except after the last one)
-            if delay_seconds > 0 and i < len(posts) - 1:
+            # Delay between posts (except after the last one, and never on a dry run)
+            if delay_seconds > 0 and not dry_run and i < len(posts) - 1:
                 time.sleep(delay_seconds)
         
         return self.results
     
+    def has_errors(self) -> bool:
+        return any(r.get("status") == "error" for r in self.results)
+
     def print_summary(self):
         """Print summary of batch operation"""
         if not self.results:
@@ -139,9 +140,6 @@ class BatchContent:
             print(f"Successfully published:      {successful}")
         if errors > 0:
             print(f"Errors:                      {errors}")
-        
-        if successful > 0:
-            print(f"\nPublished {successful} post(s) with {successful} upvote(s) each")
         
         print("="*60)
 

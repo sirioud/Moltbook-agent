@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import argparse
 from pathlib import Path
@@ -72,14 +73,15 @@ def main() -> None:
     p_agents = sub.add_parser("agents", help="List agents")
     p_agents.add_argument("--limit", type=int, default=10, help="Number of agents to fetch")
 
+    # Moltbook identifies agents by name; --agent_id is kept as an alias
     p_profile = sub.add_parser("profile", help="Get agent profile")
-    p_profile.add_argument("--agent_id", required=True)
+    p_profile.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_follow = sub.add_parser("follow", help="Follow an agent")
-    p_follow.add_argument("--agent_id", required=True)
+    p_follow.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_unfollow = sub.add_parser("unfollow", help="Unfollow an agent")
-    p_unfollow.add_argument("--agent_id", required=True)
+    p_unfollow.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_feed = sub.add_parser("feed", help="Get general feed")
     p_feed.add_argument("--filter", choices=["following"], help="Filter type")
@@ -99,7 +101,8 @@ def main() -> None:
 
     p_batch_publish = sub.add_parser("batch-publish", help="Publish posts from a batch file")
     p_batch_publish.add_argument("--file", required=True, help="Batch JSON file path")
-    p_batch_publish.add_argument("--delay", type=float, default=0, help="Delay between posts in seconds")
+    p_batch_publish.add_argument("--delay", type=float, default=1800,
+                                 help="Delay between posts in seconds (Moltbook allows 1 post per 30 min)")
     p_batch_publish.add_argument("--dry-run", action="store_true", help="Preview without posting")
 
     sub.add_parser("debug", help="Print env + computed URLs (no secrets)")
@@ -115,7 +118,7 @@ def main() -> None:
         print("MOLTBOOK_BASE_URL =", repr(base_url))
         print("Computed /agents/me =", base_url + "/agents/me")
         print("MOLTBOOK_SITE_URL =", repr(_site_url()))
-        print("API key prefix/len =", api_key[:10], len(api_key))
+        print("API key set/len =", bool(api_key), len(api_key))
         return
 
     client = MoltbookClient(base_url=base_url, api_key=api_key or None, verify_ssl=verify_ssl)
@@ -148,33 +151,31 @@ def main() -> None:
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "posts":
-            resp = client.get_posts(submolt=getattr(args, 'submolt', None), limit=getattr(args, 'limit', 10))
+            resp = client.get_posts(submolt=args.submolt, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "agents":
-            resp = client.get_agents(limit=getattr(args, 'limit', 10))
+            resp = client.get_agents(limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "profile":
-            resp = client.get_agent_profile(args.agent_id)
+            resp = client.get_agent_profile(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "follow":
-            resp = client.follow_agent(args.agent_id)
+            resp = client.follow_agent(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "unfollow":
-            resp = client.unfollow_agent(args.agent_id)
+            resp = client.unfollow_agent(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "feed":
-            filter_type = getattr(args, 'filter', None)
-            limit = getattr(args, 'limit', 10)
-            resp = client.get_feed(filter_type=filter_type, limit=limit)
+            resp = client.get_feed(filter_type=args.filter, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "search":
-            resp = client.search_posts(args.query, limit=getattr(args, 'limit', 10))
+            resp = client.search_posts(args.query, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "submolts":
@@ -193,9 +194,12 @@ def main() -> None:
             posts = batch.load_batch_file(args.file)
             batch.publish_batch(posts, delay_seconds=args.delay, dry_run=args.dry_run)
             batch.print_summary()
+            if batch.has_errors():
+                sys.exit(1)
 
-    except MoltbookError as e:
-        print(f"ERROR: {e}")
+    except (MoltbookError, FileNotFoundError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
