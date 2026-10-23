@@ -121,17 +121,17 @@ class MoltbookClient:
         """Get list of agents to discover"""
         return self._request("GET", "/agents", params={"limit": limit})
 
-    def get_agent_profile(self, agent_id: str) -> dict:
-        """Get profile of a specific agent"""
-        return self._request("GET", f"/agents/{agent_id}")
+    def get_agent_profile(self, name: str) -> dict:
+        """Get profile of a specific agent by name"""
+        return self._request("GET", "/agents/profile", params={"name": name})
 
-    def follow_agent(self, agent_id: str) -> dict:
-        """Follow an agent"""
-        return self._request("POST", f"/agents/{agent_id}/follow")
+    def follow_agent(self, name: str) -> dict:
+        """Follow an agent by name"""
+        return self._request("POST", f"/agents/{name}/follow")
 
-    def unfollow_agent(self, agent_id: str) -> dict:
-        """Unfollow an agent"""
-        return self._request("DELETE", f"/agents/{agent_id}/follow")
+    def unfollow_agent(self, name: str) -> dict:
+        """Unfollow an agent by name"""
+        return self._request("DELETE", f"/agents/{name}/follow")
 
     def get_feed(self, filter_type: Optional[str] = None, limit: int = 20) -> dict:
         """Get the general feed or filtered feed"""

@@ -73,14 +73,15 @@ def main() -> None:
     p_agents = sub.add_parser("agents", help="List agents")
     p_agents.add_argument("--limit", type=int, default=10, help="Number of agents to fetch")
 
+    # Moltbook identifies agents by name; --agent_id is kept as an alias
     p_profile = sub.add_parser("profile", help="Get agent profile")
-    p_profile.add_argument("--agent_id", required=True)
+    p_profile.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_follow = sub.add_parser("follow", help="Follow an agent")
-    p_follow.add_argument("--agent_id", required=True)
+    p_follow.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_unfollow = sub.add_parser("unfollow", help="Unfollow an agent")
-    p_unfollow.add_argument("--agent_id", required=True)
+    p_unfollow.add_argument("--name", "--agent_id", dest="name", required=True)
 
     p_feed = sub.add_parser("feed", help="Get general feed")
     p_feed.add_argument("--filter", choices=["following"], help="Filter type")
@@ -100,7 +101,8 @@ def main() -> None:
 
     p_batch_publish = sub.add_parser("batch-publish", help="Publish posts from a batch file")
     p_batch_publish.add_argument("--file", required=True, help="Batch JSON file path")
-    p_batch_publish.add_argument("--delay", type=float, default=0, help="Delay between posts in seconds")
+    p_batch_publish.add_argument("--delay", type=float, default=1800,
+                                 help="Delay between posts in seconds (Moltbook allows 1 post per 30 min)")
     p_batch_publish.add_argument("--dry-run", action="store_true", help="Preview without posting")
 
     sub.add_parser("debug", help="Print env + computed URLs (no secrets)")
@@ -157,15 +159,15 @@ def main() -> None:
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "profile":
-            resp = client.get_agent_profile(args.agent_id)
+            resp = client.get_agent_profile(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "follow":
-            resp = client.follow_agent(args.agent_id)
+            resp = client.follow_agent(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "unfollow":
-            resp = client.unfollow_agent(args.agent_id)
+            resp = client.unfollow_agent(args.name)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "feed":

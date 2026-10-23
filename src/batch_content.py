@@ -112,8 +112,8 @@ class BatchContent:
                     })
                     print(f"✗ Error: {e}")
             
-            # Delay between posts (except after the last one)
-            if delay_seconds > 0 and i < len(posts) - 1:
+            # Delay between posts (except after the last one, and never on a dry run)
+            if delay_seconds > 0 and not dry_run and i < len(posts) - 1:
                 time.sleep(delay_seconds)
         
         return self.results
