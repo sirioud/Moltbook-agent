@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import argparse
 from pathlib import Path
@@ -115,7 +116,7 @@ def main() -> None:
         print("MOLTBOOK_BASE_URL =", repr(base_url))
         print("Computed /agents/me =", base_url + "/agents/me")
         print("MOLTBOOK_SITE_URL =", repr(_site_url()))
-        print("API key prefix/len =", api_key[:10], len(api_key))
+        print("API key set/len =", bool(api_key), len(api_key))
         return
 
     client = MoltbookClient(base_url=base_url, api_key=api_key or None, verify_ssl=verify_ssl)
@@ -148,11 +149,11 @@ def main() -> None:
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "posts":
-            resp = client.get_posts(submolt=getattr(args, 'submolt', None), limit=getattr(args, 'limit', 10))
+            resp = client.get_posts(submolt=args.submolt, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "agents":
-            resp = client.get_agents(limit=getattr(args, 'limit', 10))
+            resp = client.get_agents(limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "profile":
@@ -168,13 +169,11 @@ def main() -> None:
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "feed":
-            filter_type = getattr(args, 'filter', None)
-            limit = getattr(args, 'limit', 10)
-            resp = client.get_feed(filter_type=filter_type, limit=limit)
+            resp = client.get_feed(filter_type=args.filter, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "search":
-            resp = client.search_posts(args.query, limit=getattr(args, 'limit', 10))
+            resp = client.search_posts(args.query, limit=args.limit)
             print(json.dumps(resp, indent=2, ensure_ascii=False))
 
         elif args.cmd == "submolts":
@@ -193,9 +192,12 @@ def main() -> None:
             posts = batch.load_batch_file(args.file)
             batch.publish_batch(posts, delay_seconds=args.delay, dry_run=args.dry_run)
             batch.print_summary()
+            if batch.has_errors():
+                sys.exit(1)
 
-    except MoltbookError as e:
-        print(f"ERROR: {e}")
+    except (MoltbookError, FileNotFoundError, ValueError) as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
